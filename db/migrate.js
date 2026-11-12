@@ -9,27 +9,50 @@ async function migrate() {
   await client.connect();
   console.log('Connected to database for migration...');
 
-  // 1. Rename any duplicate shortCodes if they exist
-  await client.query(`
-    WITH duplicates AS (
-      SELECT id, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY created_at) as rn
-      FROM urls
-    )
-    UPDATE urls
-    SET code = urls.code || '-' || duplicates.rn
-    FROM duplicates
-    WHERE urls.id = duplicates.id AND duplicates.rn > 1;
-  `);
-  console.log('Duplicate shortCodes updated.');
+  // 1. Ensure pgcrypto extension for gen_random_uuid()
+  await client.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto";');
+  console.log('pgcrypto extension ensured.');
 
-  // 2. Add columns if not exist
+  // 2. Create users table if not exists
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "firstName" VARCHAR(55) NOT NULL,
+      "lastName" VARCHAR(55),
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP
+    );
+  `);
+  console.log('Users table ensured.');
+
+  // 3. Create urls table if not exists
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS urls (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      code VARCHAR(155) NOT NULL,
+      target_url TEXT NOT NULL,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      expires_at TIMESTAMP,
+      password TEXT,
+      password_salt TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP
+    );
+  `);
+  console.log('URLs table ensured.');
+
+  // 4. In case table already existed, ensure new columns are present
   await client.query('ALTER TABLE urls ADD COLUMN IF NOT EXISTS clicks INTEGER NOT NULL DEFAULT 0;');
   await client.query('ALTER TABLE urls ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;');
   await client.query('ALTER TABLE urls ADD COLUMN IF NOT EXISTS password TEXT;');
   await client.query('ALTER TABLE urls ADD COLUMN IF NOT EXISTS password_salt TEXT;');
   console.log('Columns clicks, expires_at, password, password_salt ensured.');
 
-  // 3. Add unique constraint on code if not exists
+  // 5. Ensure unique constraint on code
   await client.query(`
     DO $$
     BEGIN
@@ -43,19 +66,8 @@ async function migrate() {
   `);
   console.log('Unique constraint urls_code_unique ensured.');
 
-  const res = await client.query(`
-    SELECT column_name, data_type, is_nullable
-    FROM information_schema.columns
-    WHERE table_name='urls'
-    ORDER BY ordinal_position;
-  `);
-  console.log('URLs Table Columns:', res.rows.map(r => `${r.column_name} (${r.data_type})`));
-
-  const sample = await client.query('SELECT id, code, target_url, clicks FROM urls LIMIT 5;');
-  console.log('Sample rows:', sample.rows);
-
   await client.end();
-  console.log('Migration complete!');
+  console.log('Database migration completed successfully!');
 }
 
 migrate().catch(err => {
