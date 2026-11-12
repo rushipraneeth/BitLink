@@ -1,0 +1,41 @@
+{
+  "name": "URL-SHORTENER",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index",
+    "test": "node tests/test-backend.js && node tests/test-e2e.js",
+    "db:migrate": "node db/migrate.js",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.18.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.18.0",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "drizzle-orm": "1.0.0-rc.5",
+    "express": "~4.22.3",
+    "jsonwebtoken": "^9.0.3",
+    "nanoid": "^6.0.2",
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "1.0.0-rc.5",
+    "tsx": "^4.23.15"
+  }
+}
